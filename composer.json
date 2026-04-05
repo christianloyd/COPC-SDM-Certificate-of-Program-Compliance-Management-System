@@ -1,0 +1,9 @@
+{
+    "name": "copc/copcsdm",
+    "description": "COPC Document Management and Search System",
+    "type": "project",
+    "require": {
+        "smalot/pdfparser": "^2.0",
+        "phpoffice/phpspreadsheet": "^2.0"
+    }
+}

@@ -1,0 +1,43 @@
+# ----------------------------------------------------------------------
+# PRC Document Management System - Deployment Configuration
+# Optimized for InfinityFree & General Shared Hosting (Apache)
+# ----------------------------------------------------------------------
+
+# 1. Disable directory browsing for security
+Options -Indexes
+
+# 2. Set default landing page
+DirectoryIndex index.php
+
+# 3. Security: Prevent access to sensitive core folders
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Force HTTPS (DISABLED for local development to avoid SSL errors on localhost)
+    # Enable this ONLY when deploying to InfinityFree or a live server with SSL.
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Block access to core folders (includes, db, vendor, etc)
+    # This prevents users from accessing your database configuration directly
+    RewriteRule ^(includes|db|tmp|vendor|node_modules|docs|scripts|sql)/ - [F,L]
+    
+    # Block access to sensitive system/config files
+    RewriteRule ^(\.env|\.git|composer\.json|package\.json|package-lock\.json|composer\.lock|.*\.sql|.*\.log|.*\.bak|.*\.ini) - [F,L]
+</IfModule>
+
+    # 4. Security: Prevent PHP execution in the uploads directory
+    # This prevents malicious file uploads (e.g. hack.php) from being executed
+    RewriteRule ^uploads/.*\.php$ - [F,L]
+
+# 5. PHP Settings (InfinityFree might override these, but good to include)
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size 25M
+    php_value max_execution_time 300
+    php_value memory_limit 128M
+</IfModule>
+
+# 6. Custom Error Handling (Optional: Create these if you want custom error pages)
+# ErrorDocument 404 /404.php
+# ErrorDocument 403 /403.php
