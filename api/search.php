@@ -7,18 +7,29 @@ header('Content-Type: application/json');
 try {
     $pdo = getDBConnection();
 
-    $search = isset($_GET['q']) ? trim($_GET['q']) : '';
-    $category = isset($_GET['cat']) ? trim($_GET['cat']) : '';
-    $program = isset($_GET['prog']) ? trim($_GET['prog']) : '';
-    $year = isset($_GET['yr']) ? (int) $_GET['yr'] : 0;
+    $search   = isset($_GET['q'])   ? trim($_GET['q'])       : '';
+    $category = isset($_GET['cat'])  ? trim($_GET['cat'])     : '';
+    $program  = isset($_GET['prog']) ? trim($_GET['prog'])    : '';
+    $year     = isset($_GET['yr'])   ? (int) $_GET['yr']      : 0;
 
-    $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
-    $limit = 10;
+    // Structured keyword overrides from JS parseQuery()
+    $structProgram = isset($_GET['sp']) ? trim($_GET['sp']) : '';
+    $structSchool  = isset($_GET['ss']) ? trim($_GET['ss']) : '';
+    $structYear    = isset($_GET['sy']) ? (int) $_GET['sy'] : 0;
+    $status        = isset($_GET['status']) ? trim($_GET['status']) : '';
+    // sy overrides yr when yr not set
+    if ($structYear > 0 && $year === 0) {
+        $year = $structYear;
+    }
+
+    $page   = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+    $limit  = 10;
     $offset = ($page - 1) * $limit;
 
     $where = ['1=1'];
     $whereParams = [];
 
+    $tokens = [];
     if ($search !== '') {
         $tokens = preg_split('/\s+/', $search);
 
@@ -46,6 +57,16 @@ try {
         }
     }
 
+    // Structured keyword filters (from `program: X`, `school: Y`, `year: Z` syntax)
+    if ($structProgram !== '') {
+        $where[] = 'LOWER(program) LIKE LOWER(?)';
+        $whereParams[] = '%' . $structProgram . '%';
+    }
+    if ($structSchool !== '') {
+        $where[] = 'LOWER(school_name) LIKE LOWER(?)';
+        $whereParams[] = '%' . $structSchool . '%';
+    }
+
     if ($category !== '') {
         $where[] = 'category = ?';
         $whereParams[] = $category;
@@ -59,6 +80,11 @@ try {
     if ($year > 0) {
         $where[] = 'YEAR(date_approved) = ?';
         $whereParams[] = $year;
+    }
+
+    if ($status !== '') {
+        $where[] = 'status = ?';
+        $whereParams[] = $status;
     }
 
     $relevanceSql = '0';
@@ -86,10 +112,15 @@ try {
     $countStmt->execute($whereParams);
     $totalCount = (int) $countStmt->fetchColumn();
 
+    $orderSql = "date_approved DESC, id DESC";
+    if ($relevanceSql !== '0') {
+        $orderSql = "($relevanceSql) DESC, " . $orderSql;
+    }
+
     $sql = "SELECT id, school_name, program, region, category, date_approved, status, student_list, extracted_text, entry_type, file_type, file_size_kb
             FROM copc_documents
             WHERE $whereSql
-            ORDER BY ($relevanceSql) DESC, date_approved DESC, id DESC
+            ORDER BY $orderSql
             LIMIT ? OFFSET ?";
 
     $stmt = $pdo->prepare($sql);
