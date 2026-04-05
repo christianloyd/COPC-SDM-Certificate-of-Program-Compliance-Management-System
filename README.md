@@ -49,4 +49,4 @@ The **Certificate of Program Compliance (COPC) Document Management System** is a
 - **Security Checklists**: Application incorporates `.htaccess` configurations and specific client protection scripts. Ensure root directories are appropriately permissioned on production environments.
 
 ## License
-Proprietary / All Rights Reserved. Use is strictly limited to authorized personnel.
+This project is licensed under the MIT License - see the `LICENSE` file for details.
