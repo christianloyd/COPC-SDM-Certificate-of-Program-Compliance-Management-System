@@ -1,324 +1,250 @@
 ---
-name: copc-prd
-description: "Use this skill whenever the user asks to create, update, revise, or regenerate any Product Requirements Document (PRD) for the COPC Document Management and Search System. Triggers include: any mention of 'COPC', 'PRD', 'product requirements', 'document management system', or requests to add/change/remove features, modules, tech stack choices, or sections in the COPC system spec. Also use when the user asks to produce a .docx version of the PRD, update the database schema, revise functional requirements, add new modules, or change any part of the system specification. Do NOT use for general coding tasks, unrelated document management systems, or non-COPC PRD work."
+name: copc-sdm-search-ux
+description: >
+  Use this skill when improving, enhancing, or fixing the search experience
+  for the COPC-SDM (Certificate of Program Compliance Management System).
+  The system is already built in vanilla PHP, JavaScript, and Tailwind CSS.
+  Trigger whenever the user asks to improve search, add keyword highlighting,
+  fix search behavior, add filter chips, improve result feedback, or make the
+  search smarter — even if they don't use exact technical terms. Do NOT generate
+  full UI rebuilds or React/JSX artifacts. Output vanilla JS and PHP snippets
+  that integrate into the existing system.
 ---
 
-# COPC Document Management and Search System — PRD Skill
+# COPC-SDM Search & Filter UX Skill
 
-A skill for generating, updating, and maintaining the Product Requirements Document for the **COPC Document Management and Search System** — a web-based platform that centralizes COPC and COPC Exemption records issued by CHED (Commission on Higher Education), replacing manual Excel-based tracking with a structured, searchable database.
+This skill guides Claude in **improving the search experience** of an already-built system:
 
----
+**COPC-SDM — Certificate of Program Compliance Management System**
+Stack: Vanilla PHP · Vanilla JavaScript · Tailwind CSS
 
-## Quick Reference
-
-| Task | Approach |
-|---|---|
-| Generate full PRD as `.docx` | Use the `docx` skill + this spec as content source |
-| Update a specific section | Identify affected sections → patch generator script → re-run |
-| Add a new feature/module | Update Scope, FR section, Data Model, User Flow, Risks, Metrics |
-| Change tech stack component | Find all references via grep → patch all affected sections |
-| Version bump | Update cover, header, `Replaces` field, and output filename |
-
----
-
-## Project Context
-
-The system manages two document types:
-
-- **COPC** — Certificate of Program Compliance (official program approval)
-- **COPC Exemption** — Exemption from COPC requirement
-
-Records originate from scanned files (PDF, JPG, PNG), Excel spreadsheets, or are entered manually when no physical document exists. All records must be centrally stored, consistently tagged, and full-text searchable.
+The system already has a working search bar, filter dropdowns (Document Type,
+Program, Approval Year), and a results table. The goal is to make searching
+faster, smarter, and more feedback-rich — without rebuilding what already works.
 
 ---
 
-## Confirmed Tech Stack
+## Ground Rules
 
-Always use these exact values in the PRD. Never revert to older choices.
-
-| Layer | Technology | Notes |
-|---|---|---|
-| Frontend | HTML5, **Tailwind CSS**, JavaScript | Not Bootstrap. Not plain CSS. Tailwind CSS only. |
-| Backend | **Vanilla PHP** | No frameworks (no Laravel, no Symfony) |
-| Database | **MySQL (InnoDB)** | Not PostgreSQL. Not Supabase DB. |
-| File Storage | **Local server filesystem** (`uploads/`) | Not Supabase Storage. Not S3. |
-| PDF Extraction | PHP `pdfparser` library | |
-| Image OCR | Tesseract OCR (via PHP `exec`) | |
-| Excel Reading | `PhpSpreadsheet` | |
-
-> **Critical:** Supabase is **not used** in this project at all (neither for database nor storage). If a previous PRD version mentioned Supabase PostgreSQL or Supabase Storage, those are outdated and must not be carried forward.
+- **Do NOT rewrite the full UI.** Work with what exists.
+- **Do NOT suggest React, Vue, Alpine, or any JS framework.** Vanilla JS only.
+- **Do NOT use CSS outside Tailwind utility classes** unless absolutely necessary
+  for a micro-interaction (e.g., `<mark>` highlight color).
+- **Output focused, drop-in snippets** — a function, an event listener, a PHP
+  helper — not full page rewrites.
+- Always ask which file or section to target if context is ambiguous.
 
 ---
 
-## Current PRD Version
+## Output Format
 
-| Field | Value |
-|---|---|
-| Version | 2.1 |
-| Date | March 2026 |
-| Generator script | `/home/claude/gen_prd_v2_tw.mjs` |
-| Output file | `COPC_PRD_v2.1.docx` |
-| Replaces | PRD v2.0 (Bootstrap edition) |
+When the user asks to improve something specific, output:
 
-### Version History
+1. **The specific JS function or PHP snippet** that handles the improvement
+2. **Where to place it** (e.g., "add this after line X in search.js", "replace
+   the existing `renderRows()` function")
+3. **What it replaces or extends** in the existing code
 
-| Version | Key Change |
-|---|---|
-| v1.0 | Initial — PostgreSQL + Supabase Storage |
-| v1.1 | Corrected to MySQL + Supabase Storage (hybrid) |
-| v2.0 | Full rewrite — MySQL + local storage + Manual Entry Module |
-| v2.1 | CSS framework changed from Bootstrap to **Tailwind CSS** |
+Keep snippets short and surgical. If a change touches both PHP and JS, separate
+them clearly with labeled code blocks.
 
 ---
 
-## Confirmed Modules (In Scope)
+## 1. Keyword Highlighting (Priority #1)
 
-All six modules below are confirmed in scope. Do not remove any without explicit instruction.
+This is the highlight feature of the system. When rendering search results,
+every matched keyword in the visible columns must be visually highlighted.
 
-### 1. File Upload Module (FR-1)
-- Accepts: PDF, JPG, PNG, XLSX
-- Validates: MIME type + file size (max 20 MB) server-side
-- Stores: file to `uploads/copc/` or `uploads/exemptions/` based on category
-- Saves: `file_path` (server-relative) in MySQL
+**Implementation approach (vanilla JS):**
 
-### 2. Manual Data Entry Module (FR-2) ⭐ Added in v2.0
-- Admin can create records **without uploading any file**
-- Same metadata fields as upload: school name, program, category, date approved
-- `file_path` and `extracted_text` stored as `NULL`
-- Records visually distinguished in search results with a "Manual Entry — No File" badge
-- Admin can later attach a file to a manual-entry record
-- Optional `notes` field for free-text context
+- After fetching results (AJAX or page reload), run a `highlight(text, query)`
+  function over each cell's text content before inserting into the DOM.
+- Wrap matched substrings in `<mark>` tags.
+- Style `<mark>` with Tailwind: `bg-yellow-200 text-yellow-900 rounded px-0.5`
+  or a small inline `<style>` block if Tailwind's purge removes it.
 
-### 3. Text Extraction Engine (FR-3)
-- PDF → `pdfparser`
-- Image (JPG/PNG) → Tesseract OCR via `exec()`
-- XLSX → `PhpSpreadsheet`
-- Extraction failure does **not** block record save; failure is logged
-- Admin can manually re-trigger extraction per record
-
-### 4. Search Module (FR-4)
-- MySQL `FULLTEXT` search using `MATCH ... AGAINST`
-- Searches across: `school_name`, `program`, `extracted_text`
-- Filters: Category, Program, Approval Year
-- Results include: record type badge, preview/download (file-backed) or "No File" (manual)
-- Response time target: **< 2 seconds** for up to 10,000 records
-
-### 5. Admin Controls (FR-5)
-- Full CRUD on all records (both upload and manual-entry)
-- Edit includes option to attach file to manual-entry records
-- Delete removes DB record + associated file (if any)
-- Confirmation dialog required before delete
-
-### 6. Authentication and Access Control (FR-6)
-- Session-based PHP login for admin users
-- Unauthenticated users: read-only search access only
-- Passwords: bcrypt hash (`password_hash` / `PASSWORD_BCRYPT`)
-- CSRF tokens on all state-changing forms
-- Session timeout: 60 minutes inactivity
-
----
-
-## Data Model
-
-### Primary table: `copc_documents`
-
-```sql
-CREATE TABLE copc_documents (
-  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  school_name    VARCHAR(255)    NOT NULL,
-  program        VARCHAR(255)    NOT NULL,
-  category       ENUM('COPC', 'COPC Exemption') NOT NULL,
-  date_approved  DATE            NOT NULL,
-  file_path      VARCHAR(500)    NULL,        -- NULL for manual-entry records
-  file_type      VARCHAR(10)     NULL,        -- 'pdf', 'jpg', 'png', 'xlsx' or NULL
-  file_name      VARCHAR(255)    NULL,
-  file_size_kb   INT UNSIGNED    NULL,
-  extracted_text LONGTEXT        NULL,        -- NULL if no file or extraction failed
-  notes          TEXT            NULL,        -- Optional admin notes
-  entry_type     ENUM('upload', 'manual') NOT NULL DEFAULT 'upload',
-  uploaded_by    VARCHAR(100)    NULL,
-  created_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at     DATETIME        NULL ON UPDATE CURRENT_TIMESTAMP,
-
-  INDEX idx_school_name  (school_name),
-  INDEX idx_program      (program),
-  INDEX idx_category     (category),
-  INDEX idx_date_approved(date_approved),
-  INDEX idx_entry_type   (entry_type),
-  FULLTEXT INDEX ft_search (school_name, program, extracted_text)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```js
+function highlight(text, query) {
+  if (!query || query.length < 2) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
+}
 ```
 
-### Supporting table: `admin_users`
+**Apply to columns:** School, Program, Student Names, and any OCR content field.
 
-```sql
-CREATE TABLE admin_users (
-  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  username       VARCHAR(100)    NOT NULL UNIQUE,
-  password_hash  VARCHAR(255)    NOT NULL,
-  full_name      VARCHAR(200)    NULL,
-  created_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_login_at  DATETIME        NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+**Debounce the search input** to avoid re-rendering on every keystroke:
+
+```js
+let debounceTimer;
+searchInput.addEventListener('input', function () {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => runSearch(), 300);
+});
 ```
-
-### File storage layout
-
-```
-uploads/
-├── copc/           ← COPC files
-│   └── {YYYYMMDD}_{hex}_{sanitized_name}.{ext}
-└── exemptions/     ← COPC Exemption files
-    └── {YYYYMMDD}_{hex}_{sanitized_name}.{ext}
-```
-
-All file downloads are routed through `download.php` — files are never served directly from the filesystem URL.
 
 ---
 
-## User Personas
+## 2. Live Result Count & Feedback
 
-| Persona | Role | Primary Actions |
-|---|---|---|
-| Admin Staff | Records / Administrative Officer | Upload files, manually enter records, edit/delete, manage metadata |
-| Office Personnel | Compliance staff, faculty coordinators | Search, filter, preview, download |
+Users need to know immediately how many records match. Add a count display
+beneath the search bar that updates in real time.
 
----
+- Show: `1,245 results found` when results exist
+- Show: `No results for "keyword"` when empty
+- Show nothing when the search is blank and no filters are applied
 
-## Non-Functional Requirements (Confirmed Targets)
+In PHP (server-rendered): pass the count to the template and render it in a
+`<span id="result-count">` element.
 
-| Category | Requirement | Target |
-|---|---|---|
-| Performance | Search response time | < 2 seconds (10,000 records) |
-| Performance | File upload + save (excl. OCR) | < 5 seconds (< 10 MB files) |
-| Performance | OCR per image | < 30 seconds |
-| Performance | Manual entry save | < 1 second |
-| Security | File validation | MIME type + extension whitelist, server-side |
-| Security | SQL injection | PDO prepared statements on all queries |
-| Security | CSRF | Token on every POST form |
-| Availability | Uptime | > 99.5% monthly |
-| Storage | Max file size | 20 MB per file |
-| Backup | MySQL dump | Daily automated |
+In JS (AJAX/live): update `document.getElementById('result-count').textContent`
+after each search response.
 
 ---
 
-## PRD Document Structure
+## 3. Clear (✕) Button Inside Search Input
 
-The PRD is generated as a `.docx` using the `docx` npm library (Node.js ESM). The 13 sections are:
+Add a clear button that appears inside the search box as soon as the user
+starts typing. Clicking it resets the input and re-runs the search.
 
-1. Executive Summary
-2. Problem Statement
-3. Objectives
-4. Scope (In Scope / Out of Scope)
-5. User Personas
-6. Functional Requirements (FR-1 through FR-6)
-7. Non-Functional Requirements
-8. System Architecture Overview
-9. Data Model
-10. User Flow (4 flows: Upload, Manual Entry, Search, Edit/Delete)
-11. Success Metrics
-12. Risks and Mitigations
-13. Future Enhancements
+- Position: absolute, right side of the input, vertically centered
+- Show/hide: toggle `hidden` Tailwind class based on input value
+- On click: clear input value, trigger search, return focus to input
 
-### Document styling conventions
+This is a small change with high perceived impact — users should never have
+to manually select-all and delete.
 
-| Element | Style |
+---
+
+## 4. Active Filter Chips
+
+When a filter dropdown is changed from its default (e.g., "All Types" →
+"COPC Only"), show a removable chip below the filter row so users know
+a filter is active.
+
+**Chip format:**
+```
+[Document Type: COPC Only  ×]
+```
+
+**Behavior:**
+- Clicking `×` resets that dropdown to its default value and re-runs the search
+- If 2+ chips are active, show a `Clear All` text link at the end of the chip row
+- Chips row is hidden when no filters are active
+
+**In vanilla JS:** listen to `change` events on each filter `<select>`, then
+call a `renderChips()` function that rebuilds the chips container's innerHTML.
+
+---
+
+## 5. Structured Query Syntax (Power Users)
+
+Allow users to type field-scoped queries directly in the search bar:
+
+| Syntax | Effect |
 |---|---|
-| H1 color | `#1F3864` (dark blue) |
-| H2 color | `#2E75B6` (mid blue) |
-| Accent (Manual Entry) | `#2196A6` (teal) |
-| Table header fill | `#1F3864` with white text |
-| Alternating row fill | `#EBF3FB` (light blue) |
-| FR priority badges | Green = Must Have, Blue = Should Have, Brown = Nice to Have |
-| Page size | US Letter (12240 × 15840 DXA) |
-| Margins | 1080 DXA all sides (~0.75 inch) |
-| Font | Arial throughout |
+| `program: nursing` | Filters by program name |
+| `school: ust` | Filters by school name |
+| `year: 2023` | Filters by approval year |
+
+**Parse on the JS side** before sending to PHP:
+
+```js
+function parseQuery(q) {
+  const structured = {};
+  let plain = q;
+  const re = /(program|school|year):\s*([^\s]+)/gi;
+  let m;
+  while ((m = re.exec(q)) !== null) {
+    structured[m[1].toLowerCase()] = m[2];
+    plain = plain.replace(m[0], '').trim();
+  }
+  return { structured, plain };
+}
+```
+
+Pass `structured` fields as separate GET/POST parameters to PHP so they can
+be applied as precise WHERE clauses, and use `plain` for the general full-text
+search.
 
 ---
 
-## How to Update the PRD
+## 6. Search Hint Text
 
-### Changing a tech stack item
+Below the search bar, show a subtle hint that updates contextually:
 
-1. `grep` the generator script for all occurrences of the old technology name
-2. Replace in: Executive Summary body, info box, Scope table, Architecture table, Architecture bullets, NFR table
-3. Bump the version number in: cover page, header text, `Replaces` field, output filename
-4. Re-run: `node gen_prd_v2_tw.mjs`
-5. Validate: `python3 /mnt/skills/public/docx/scripts/office/validate.py COPC_PRD_vX.Y.docx`
+- Default: `Try: program: nursing  |  school: ust  |  year: 2023`
+- While typing: hide the hint (it's no longer needed)
+- On empty result: show `Try broader keywords or remove filters`
 
-### Adding a new module
-
-Update **all** of the following sections when a new module is added:
-
-- [ ] Section 4 — Scope (In Scope table)
-- [ ] Section 6 — Functional Requirements (new FR-N subsection)
-- [ ] Section 8 — Architecture (component diagram text)
-- [ ] Section 9 — Data Model (new columns if needed)
-- [ ] Section 10 — User Flow (new flow if user-facing)
-- [ ] Section 11 — Success Metrics (new metric if measurable)
-- [ ] Section 12 — Risks (new risk if applicable)
-- [ ] Section 13 — Future Enhancements (remove from future if now in scope)
-
-### Removing a module
-
-Move it from Section 4 (In Scope) → Section 4 (Out of Scope) with a reason. Remove its FR subsection. Update Architecture and Data Model accordingly.
+Use a `<p id="search-hint">` element and toggle its content with JS.
 
 ---
 
-## Out of Scope (Do Not Add Without Instruction)
+## 7. Empty State
 
-These are explicitly deferred. Do not add them to In Scope unless the user requests it:
+When the search + filters return zero results, replace the empty table with
+a centered message block. Do not leave a blank table visible.
 
-- Mobile native app
-- Automated CHED API integration
-- Document version history / audit log (planned v1.1)
-- Batch reporting / export dashboard (planned v2.0)
-- Email / SMS notifications (planned v2.0)
-- Cloud file storage migration (planned v2.0)
-- Third-party SSO
-- Multi-language UI
-- AI-assisted metadata suggestion (planned v3.0)
-- Public-facing portal (planned v3.0)
+```html
+<div id="empty-state" class="hidden text-center py-16">
+  <p class="text-gray-400 text-4xl mb-3">🔍</p>
+  <p class="text-gray-700 font-semibold text-base mb-1">No results found</p>
+  <p class="text-gray-400 text-sm leading-relaxed">
+    Check your spelling · Remove a filter · Try broader keywords
+  </p>
+  <button id="empty-clear" class="mt-4 text-sm border border-gray-300 rounded px-4 py-1.5 hover:bg-gray-50">
+    Clear All Filters
+  </button>
+</div>
+```
 
----
-
-## Planned Future Enhancements (Section 13 Summary)
-
-| Enhancement | Target Version |
-|---|---|
-| Async extraction job queue | v1.1 |
-| Audit log | v1.1 |
-| Duplicate detection (SHA-256 hash) | v1.1 |
-| File attachment for manual records | v1.1 |
-| Bulk data import from Excel | v1.1 |
-| Reporting / analytics dashboard | v2.0 |
-| Role-based access control (RBAC) | v2.0 |
-| Email notifications | v2.0 |
-| Cloud file storage migration | v2.0 |
-| AI-assisted metadata suggestion | v3.0 |
-| Digital signature verification | v3.0 |
-| Public-facing search portal | v3.0 |
+Toggle between `<table>` and `#empty-state` based on result count.
 
 ---
 
-## Common Pitfalls to Avoid
+## 8. PHP-Side Search Tips
 
-- **Never use Supabase** — it was used in v1.0/v1.1 only; this project uses MySQL + local storage
-- **Never use Bootstrap** — the project uses Tailwind CSS since v2.1
-- **Never use PostgreSQL types** (`UUID`, `TSVECTOR`, `TIMESTAMPTZ`) — use MySQL types (`BIGINT UNSIGNED AUTO_INCREMENT`, `LONGTEXT`, `DATETIME`)
-- **Never use `WidthType.PERCENTAGE`** in docx tables — always use `WidthType.DXA`
-- **Never use unicode bullet characters** in docx — always use `LevelFormat.BULLET` with numbering config
-- **Manual entry records share the same table** as upload records — differentiated by `entry_type` ENUM and `file_path IS NULL`
-- **All file downloads must go through `download.php`** — never expose raw filesystem paths to the browser
+When helping with the backend search logic:
+
+- Use `LIKE %keyword%` for general text search across school, program, and
+  student name columns
+- For OCR content, search the stored OCR text column with `LIKE %keyword%`
+- Prefer `LOWER()` on both sides for case-insensitive matching in MySQL
+- Return the total matched count alongside results so JS can display it
+  without a second query: use `SQL_CALC_FOUND_ROWS` + `FOUND_ROWS()`
+- Sanitize all inputs with `mysqli_real_escape_string()` or prepared statements
 
 ---
 
-## Dependencies
+## 9. UX Quality Standards
 
-- `docx` npm package (v9.5.3): `npm install -g docx` — for `.docx` generation
-- `node` (v18+): ESM module support required
-- `python3`: for validation script
-- Validation script: `/mnt/skills/public/docx/scripts/office/validate.py`
-- Generator script: `/home/claude/gen_prd_v2_tw.mjs`
+- Highlight matched keywords in School, Program, and Student Names columns
+- Debounce the search input (300ms) to avoid excessive PHP queries
+- Never leave users staring at an empty table — always show count or empty state
+- Keep filter interactions instant — chips appear/disappear without page reload
+- Preserve the search state in the URL (via query string) so results are shareable
 
-> When generating the `.docx`, always validate after generation. If validation fails, check for: mismatched column widths in tables, invalid `PageNumber` usage, or missing `outlineLevel` on heading paragraphs.
+---
+
+## Improvement Priority Order
+
+When the user asks "how do I improve the search?" suggest improvements in
+this order — each one is independent and can be done separately:
+
+1. Keyword highlighting in result rows
+2. Live result count display
+3. Clear (✕) button in the search input
+4. Active filter chips
+5. Empty state message
+6. Search hint text
+7. Debounced input
+8. Structured query syntax
+
+---
+
+## Goal
+
+Make searching feel **instant, intelligent, and transparent** — users should
+always know what they searched, how many results matched, and what filters
+are active, without any page ambiguity.
