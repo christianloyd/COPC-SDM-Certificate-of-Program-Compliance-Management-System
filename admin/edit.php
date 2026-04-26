@@ -6,7 +6,6 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/extraction.php';
 
 $pageTitle = "Edit Record";
-require_once __DIR__ . '/../includes/admin_header.php';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if (!$id) {
@@ -17,6 +16,23 @@ $error = '';
 $success = '';
 
 $pdo = getDBConnection();
+
+// Fetch all existing programs and schools for the searchable dropdowns
+try {
+    $allPrograms = $pdo->query("SELECT DISTINCT program FROM copc_documents WHERE program IS NOT NULL AND program != '' ORDER BY program ASC")->fetchAll(PDO::FETCH_COLUMN);
+    $allSchools  = $pdo->query("SELECT DISTINCT school_name FROM copc_documents WHERE school_name IS NOT NULL AND school_name != '' ORDER BY school_name ASC")->fetchAll(PDO::FETCH_COLUMN);
+    
+    // Standard Philippine Regions
+    $allRegions = [
+        'NCR', 'CAR', 'Region I', 'Region II', 'Region III', 'Region IV-A', 
+        'Region IV-B', 'Region V', 'Region VI', 'Region VII', 'Region VIII', 
+        'Region IX', 'Region X', 'Region XI', 'Region XII', 'Region XIII', 
+        'Region XVIII (NIR)', 'BARMM'
+    ];
+} catch (\Exception $e) {
+    $allPrograms = [];
+    $allSchools = [];
+}
 
 // Handle form submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -31,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = trim($_POST['status'] ?? 'NEW');
         $studentList = trim($_POST['student_list'] ?? '');
         $notes = trim($_POST['notes'] ?? '');
+        $copcNo = trim($_POST['copc_no'] ?? '');
         
         try {
             // First, get current record
@@ -42,10 +59,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception("Record not found.");
             }
 
+            // Clash detection: ensure no OTHER record has the same duplicate key
+            $clashSql = "SELECT id FROM copc_documents WHERE school_name = ? AND program = ? AND category = ? AND student_list = ? AND id != ? LIMIT 1";
+            $clashStmt = $pdo->prepare($clashSql);
+            $clashStmt->execute([$school, $program, $category, $studentList, $id]);
+            $clash = $clashStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($clash) {
+                throw new Exception("Cannot save — another record (ID #{$clash['id']}) already has the same School, Program, Category, and Student List. Please resolve the conflict first.");
+            }
+
             // Update metadata including new fields
-            $updateSql = "UPDATE copc_documents SET school_name=?, program=?, region=?, category=?, date_approved=?, status=?, student_list=?, notes=? WHERE id=?";
+            $updateSql = "UPDATE copc_documents SET school_name=?, program=?, region=?, category=?, copc_no=?, date_approved=?, status=?, student_list=?, notes=? WHERE id=?";
             $updateStmt = $pdo->prepare($updateSql);
-            $updateStmt->execute([$school, $program, $region, $category, $dateApproved, $status, $studentList, $notes, $id]);
+            $updateStmt->execute([$school, $program, $region, $category, $copcNo ?: null, $dateApproved, $status, $studentList, $notes, $id]);
             $success = "Metadata updated successfully.";
 
             // Handle file attachment for manual entry -> upload upgrade
@@ -157,6 +184,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            setFlashMessage('success', $success, 'Record Updated');
+            header('Location: ' . BASE_URL . '/admin/edit.php?id=' . $id);
+            exit;
+
         } catch (\Exception $e) {
             $error = $e->getMessage();
         }
@@ -172,7 +203,45 @@ if (!$record) {
     die("Record not found.");
 }
 $csrfToken = generateCsrfToken();
+
+require_once __DIR__ . '/../includes/admin_header.php';
 ?>
+
+<style>
+    /* ── Searchable Combobox Styles ────────────────────────────────── */
+    .combobox-wrapper { position: relative; }
+    .combobox-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        max-height: 240px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        z-index: 50;
+        display: none;
+        scrollbar-width: thin;
+    }
+    .combobox-dropdown.active { display: block; }
+    .combobox-item {
+        padding: 10px 14px;
+        font-size: 0.875rem;
+        color: #1e3a5f;
+        cursor: pointer;
+        transition: background 0.1s;
+        border-bottom: 1px solid #f9fafb;
+    }
+    .combobox-item:last-child { border-bottom: none; }
+    .combobox-item:hover, .combobox-item.selected { background: #eff6ff; color: #1d4ed8; }
+    .combobox-item.new-entry { font-style: italic; color: #6b7280; border-top: 1px solid #f3f4f6; }
+    .combobox-no-results { padding: 12px; text-align: center; color: #9ca3af; font-size: 0.75rem; }
+    
+    /* Highlight matching text */
+    .combobox-match { font-weight: 800; text-decoration: underline; color: #1e40af; }
+</style>
 
 <div class="max-w-5xl mx-auto">
     <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -198,15 +267,27 @@ $csrfToken = generateCsrfToken();
         <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 border-b border-gray-50">
             <div class="md:col-span-2">
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Administrative Region</label>
-                <input type="text" name="region" value="<?php echo h($record['region']); ?>" class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                <div class="combobox-wrapper" data-options='<?php echo htmlspecialchars(json_encode($allRegions), ENT_QUOTES, 'UTF-8'); ?>'>
+                    <input type="text" name="region" id="regionEdit" value="<?php echo h($record['region']); ?>" autocomplete="off"
+                           class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition combobox-input">
+                    <div class="combobox-dropdown"></div>
+                </div>
             </div>
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">School Entity *</label>
-                <input type="text" name="school_name" value="<?php echo h($record['school_name']); ?>" required class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                <div class="combobox-wrapper" data-options='<?php echo htmlspecialchars(json_encode($allSchools), ENT_QUOTES, 'UTF-8'); ?>'>
+                    <input type="text" name="school_name" id="schoolNameEdit" value="<?php echo h($record['school_name']); ?>" required autocomplete="off"
+                           class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition combobox-input">
+                    <div class="combobox-dropdown"></div>
+                </div>
             </div>
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Degree Program *</label>
-                <input type="text" name="program" value="<?php echo h($record['program']); ?>" required class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                <div class="combobox-wrapper" data-options='<?php echo htmlspecialchars(json_encode($allPrograms), ENT_QUOTES, 'UTF-8'); ?>'>
+                    <input type="text" name="program" id="programEdit" value="<?php echo h($record['program']); ?>" required autocomplete="off"
+                           class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition combobox-input">
+                    <div class="combobox-dropdown"></div>
+                </div>
             </div>
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Category Selection *</label>
@@ -220,6 +301,16 @@ $csrfToken = generateCsrfToken();
             <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Approval Date *</label>
                 <input type="date" name="date_approved" value="<?php echo h($record['date_approved']); ?>" required class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+            </div>
+            <div class="md:col-span-2" id="copcNoContainerEdit">
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    <i class="fa-solid fa-hashtag mr-1 text-prcgold"></i> COPC / Resolution No.
+                </label>
+                <input type="text" name="copc_no" id="copcNoEdit"
+                       value="<?php echo h($record['copc_no'] ?? ''); ?>"
+                       placeholder="e.g. COPC No. 30 S. 2021"
+                       class="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 text-prcnavy font-semibold focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                <p class="text-[10px] text-gray-400 mt-1.5 italic px-1">The official COPC certificate or resolution number found on the document.</p>
             </div>
             <div class="md:col-span-2">
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Database Status</label>
@@ -281,14 +372,135 @@ $csrfToken = generateCsrfToken();
 </div>
 
 <script>
-    document.getElementById('categoryEdit').addEventListener('change', function() {
-        const container = document.getElementById('studentListContainerEdit');
-        if (this.value === 'COPC Exemption') {
-            container.classList.remove('hidden');
-        } else {
-            container.classList.add('hidden');
+    document.addEventListener('DOMContentLoaded', function () {
+        // ── Existing Visibility Logic ───────────────────────────────────────
+        const catSel    = document.getElementById('categoryEdit');
+        const copcCont  = document.getElementById('copcNoContainerEdit');
+        const studentCont = document.getElementById('studentListContainerEdit');
+
+        function syncVisibility() {
+            if (!catSel) return;
+            const val = catSel.value;
+            if (copcCont) copcCont.classList.toggle('hidden', val !== 'COPC' && val !== 'GR');
+            if (studentCont) studentCont.classList.toggle('hidden', val !== 'COPC Exemption');
         }
+
+        if (catSel) {
+            catSel.addEventListener('change', syncVisibility);
+            syncVisibility(); // run on load
+        }
+
+        // ── Searchable Combobox Logic ───────────────────────────────────────────
+        function initCombobox(wrapper) {
+            const input    = wrapper.querySelector('.combobox-input');
+            const dropdown = wrapper.querySelector('.combobox-dropdown');
+            const options  = JSON.parse(wrapper.dataset.options || '[]');
+            let activeIdx  = -1;
+
+            function renderDropdown(filterText = '') {
+                const query = filterText.toLowerCase().trim();
+                const filtered = options.filter(opt => opt.toLowerCase().includes(query));
+                
+                if (filtered.length === 0 && query === '') {
+                    dropdown.classList.remove('active');
+                    return;
+                }
+
+                let html = '';
+                const displayLimit = 50;
+                const matches = filtered.slice(0, displayLimit);
+
+                matches.forEach((opt, idx) => {
+                    const highlighted = opt.replace(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), '<span class="combobox-match">$1</span>');
+                    html += `<div class="combobox-item" data-value="${escapeHtml(opt)}">${highlighted}</div>`;
+                });
+
+                if (matches.length === 0 && query !== '') {
+                    html = `<div class="combobox-no-results">No existing entries match "${escapeHtml(filterText)}"</div>`;
+                    html += `<div class="combobox-item new-entry" data-value="${escapeHtml(filterText)}">Add new: "${escapeHtml(filterText)}"</div>`;
+                } else if (filtered.length > displayLimit) {
+                    html += `<div class="combobox-no-results text-[10px] opacity-60">Showing first ${displayLimit} matches...</div>`;
+                }
+
+                dropdown.innerHTML = html;
+                dropdown.classList.add('active');
+                activeIdx = -1;
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            input.addEventListener('input', (e) => {
+                renderDropdown(e.target.value);
+            });
+
+            input.addEventListener('focus', () => {
+                if (input.value.trim() !== '') renderDropdown(input.value);
+                else if (options.length > 0) renderDropdown('');
+            });
+
+            input.addEventListener('blur', () => {
+                dropdown.classList.remove('active');
+            });
+
+            dropdown.addEventListener('mousedown', (e) => {
+                const item = e.target.closest('.combobox-item');
+                if (item) {
+                    e.preventDefault(); // Prevents input from losing focus immediately
+                    input.value = item.dataset.value;
+                    dropdown.classList.remove('active');
+                    input.dispatchEvent(new Event('change'));
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                const items = dropdown.querySelectorAll('.combobox-item');
+                if (!dropdown.classList.contains('active')) {
+                    if (e.key === 'ArrowDown') renderDropdown(input.value);
+                    return;
+                }
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeIdx = Math.min(activeIdx + 1, items.length - 1);
+                    updateSelection(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeIdx = Math.max(activeIdx - 1, 0);
+                    updateSelection(items);
+                } else if (e.key === 'Enter' && activeIdx >= 0) {
+                    e.preventDefault();
+                    items[activeIdx].click();
+                } else if (e.key === 'Escape') {
+                    dropdown.classList.remove('active');
+                }
+            });
+
+            function updateSelection(items) {
+                items.forEach((item, idx) => {
+                    item.classList.toggle('selected', idx === activeIdx);
+                    if (idx === activeIdx) item.scrollIntoView({ block: 'nearest' });
+                });
+            }
+        }
+
+        document.querySelectorAll('.combobox-wrapper').forEach(initCombobox);
     });
 </script>
 
-<?php require_once __DIR__ . '/../includes/admin_header.php'; ?>
+<?php if ($error !== ''): ?>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        window.showAppToast({
+            title: 'Update Failed',
+            message: <?php echo json_encode($error, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+            type: 'error'
+        });
+    });
+</script>
+<?php endif; ?>
+
+<?php require_once __DIR__ . '/../includes/admin_footer.php'; ?>

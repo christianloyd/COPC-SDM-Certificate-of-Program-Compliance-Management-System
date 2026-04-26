@@ -38,6 +38,41 @@
             </div>
         </div>
     </div>
+    <div id="appConfirmModal" class="fixed inset-0 z-[115] hidden bg-prcnavy/70 p-4">
+        <div class="flex min-h-screen items-center justify-center">
+            <div class="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-soft-lg">
+                <div class="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+                    <div class="flex items-center">
+                        <div id="appConfirmIcon" class="mr-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                            <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 id="appConfirmTitle" class="text-lg font-bold text-prcnavy">Confirm Action</h3>
+                            <p id="appConfirmSubtitle" class="text-xs uppercase tracking-widest text-gray-400">Review before continuing</p>
+                        </div>
+                    </div>
+                    <button id="appConfirmClose" type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 hover:text-gray-900">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="px-6 py-5">
+                    <div id="appConfirmMessage" class="whitespace-pre-line text-sm leading-relaxed text-gray-600"></div>
+                </div>
+                <div class="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
+                    <button id="appConfirmCancel" type="button" class="inline-flex items-center justify-center rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-bold uppercase tracking-widest text-gray-600 transition hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button id="appConfirmOk" type="button" class="inline-flex items-center justify-center rounded-xl bg-prcnavy px-5 py-2.5 text-sm font-bold uppercase tracking-widest text-white transition hover:bg-prcaccent">
+                        Continue
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="appToastStack" class="pointer-events-none fixed right-4 top-4 z-[120] flex w-full max-w-sm flex-col gap-3"></div>
+    <script>
+        window.__APP_FLASH_MESSAGES__ = <?php echo json_encode($flashMessages ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    </script>
     <script src="<?php echo BASE_URL; ?>/assets/js/admin.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {

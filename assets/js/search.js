@@ -385,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <th class="px-6 py-4 border-b border-gray-100 w-[14rem]">Category</th>
                 <th class="px-6 py-4 border-b border-gray-100 w-[34rem]">School</th>
                 <th class="px-6 py-4 border-b border-gray-100 w-[32rem]">Program</th>
+                <th class="px-6 py-4 border-b border-gray-100 w-[16rem]">COPC No.</th>
                 <th class="px-6 py-4 border-b border-gray-100 w-[18rem]">Student Names</th>
                 <th class="px-6 py-4 border-b border-gray-100 w-[14rem]">Region</th>
                 <th class="px-6 py-4 border-b border-gray-100 w-[12rem]">Approved</th>
@@ -483,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Highlighted fields
                 const hSchool  = highlight(escapeHtml(rc.school_name || ''), q);
                 const hProgram = highlight(escapeHtml(rc.program || ''), q);
+                const hCopcNo  = highlight(escapeHtml(rc.copc_no || 'N/A'), q);
 
                 // Student preview already contains escaped HTML — highlight plain text only
                 const rawStudentSummary = studentPreview.summary;
@@ -497,6 +499,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                     <td class="px-6 py-4 align-top">
                         <div class="min-w-[24rem] text-sm font-medium text-gray-700 leading-relaxed">${hProgram}</div>
+                    </td>
+                    <td class="px-6 py-4 align-top">
+                        <div class="min-w-[12rem] text-sm font-semibold text-gray-600 leading-relaxed">${hCopcNo}</div>
                     </td>
                     <td class="px-6 py-4 align-top">
                         <div class="min-w-[14rem] text-sm text-gray-600 leading-relaxed">${rawStudentSummary}</div>
@@ -546,6 +551,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const rc = recordStore.get(String(id));
         if (!rc) return;
         const studentPreview = getStudentPreview(rc);
+        const displayCopcNo = rc.copc_no ? escapeHtml(rc.copc_no) : 'N/A';
+        const displayNotes = rc.notes ? escapeHtml(rc.notes).replace(/\n/g, '<br>') : 'N/A';
+        const displayEntryType = rc.entry_type === 'manual' ? 'Manual Entry' : (rc.file_type ? `${rc.file_type.toUpperCase()} File` : 'Uploaded File');
 
         const catBadge = rc.category === 'COPC'
             ? '<span class="px-3 py-1 text-xs font-bold rounded-full bg-prcnavy text-white shadow-sm flex items-center"><i class="fa-solid fa-certificate mr-1.5 text-prcgold"></i> COPC</span>'
@@ -558,6 +566,37 @@ document.addEventListener('DOMContentLoaded', () => {
         let statusBadge = '';
         if (rc.status === 'NEW') statusBadge = '<span class="px-3 py-1 text-xs font-bold rounded-full bg-green-100 text-green-700 shadow-sm">NEW</span>';
         else if (rc.status === 'OLD') statusBadge = '<span class="px-3 py-1 text-xs font-bold rounded-full bg-gray-100 text-gray-600 shadow-sm">OLD</span>';
+
+        let detailsGrid = '';
+        if (rc.category !== 'HEI List') {
+            detailsGrid = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 px-5 py-4 transition hover:bg-white hover:shadow-sm">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center">
+                        <i class="fa-solid fa-graduation-cap mr-2 text-prcgold/40"></i> Program
+                    </div>
+                    <div class="text-sm font-bold text-prcnavy leading-relaxed">${escapeHtml(rc.program || 'N/A')}</div>
+                </div>
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 px-5 py-4 transition hover:bg-white hover:shadow-sm">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center">
+                        <i class="fa-solid fa-hashtag mr-2 text-prcgold/40"></i> COPC / Resolution No.
+                    </div>
+                    <div class="text-sm font-bold text-prcnavy leading-relaxed">${displayCopcNo}</div>
+                </div>
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 px-5 py-4 transition hover:bg-white hover:shadow-sm">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center">
+                        <i class="fa-solid fa-circle-info mr-2 text-prcgold/40"></i> Record Status
+                    </div>
+                    <div class="text-sm font-bold text-gray-700">${escapeHtml(rc.status || 'N/A')}</div>
+                </div>
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 px-5 py-4 transition hover:bg-white hover:shadow-sm">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center">
+                        <i class="fa-solid fa-database mr-2 text-prcgold/40"></i> Entry Type
+                    </div>
+                    <div class="text-sm font-bold text-gray-700">${escapeHtml(displayEntryType)}</div>
+                </div>
+            </div>`;
+        }
 
         let mainContentUI = '';
         if (rc.category === 'HEI List') {
@@ -585,6 +624,12 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         }
 
+        const notesSection = `
+        <div class="mt-4 rounded-2xl border border-gray-100 bg-white px-4 py-4">
+            <div class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Notes</div>
+            <div class="text-sm text-gray-600 leading-relaxed">${displayNotes}</div>
+        </div>`;
+
         resultModalContent.innerHTML = `
         <div class="bg-white rounded-2xl border border-gray-50 flex flex-col p-6 lg:p-8">
             <div class="flex flex-wrap gap-2 justify-between items-start mb-6 pb-4 border-b border-gray-50 border-dashed">
@@ -597,7 +642,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="flex items-center mb-4 text-xs font-bold text-gray-400 uppercase tracking-widest">
                 <i class="fa-solid fa-location-dot mr-1.5 text-prcgold/50"></i> ${escapeHtml(rc.region || 'Unknown Region')}
             </div>
+            ${detailsGrid}
             ${mainContentUI}
+            ${rc.category === 'HEI List' ? '' : notesSection}
             <div class="mt-8">${buildFileUI(rc)}</div>
         </div>`;
 

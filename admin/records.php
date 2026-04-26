@@ -105,6 +105,12 @@ function getPageUrl($p, $search, $category, $regionFilter, $statusFilter) {
         <h1 class="text-2xl font-bold text-prcnavy">Record Vault</h1>
         <p class="text-sm text-gray-500 mt-1">Manage all administrative documents and batch-imported lists. Total: <?php echo number_format($totalRecords); ?></p>
     </div>
+    <div class="flex items-center gap-3">
+        <span id="selectedRecordsCount" class="hidden rounded-full bg-red-50 px-3 py-2 text-xs font-bold uppercase tracking-widest text-red-500 border border-red-100">0 selected</span>
+        <button type="button" id="bulkDeleteButton" class="hidden inline-flex items-center rounded-xl bg-red-500 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-md transition hover:bg-red-600">
+            <i class="fa-solid fa-trash-can mr-2"></i> Delete Selected
+        </button>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -146,9 +152,17 @@ function getPageUrl($p, $search, $category, $regionFilter, $statusFilter) {
 <!-- Table -->
 <div class="bg-white rounded-2xl shadow-soft border border-gray-100 overflow-hidden mb-12">
     <div class="overflow-x-auto">
+        <form id="bulkDeleteForm" method="POST" action="delete.php">
+            <input type="hidden" name="csrf_token" value="<?php echo h($csrfToken); ?>">
         <table class="min-w-[1700px] w-full text-left border-collapse">
             <thead>
                 <tr class="bg-prclight text-prcnavy text-xs font-bold uppercase tracking-widest">
+                    <th class="px-6 py-4 border-b border-gray-100 w-[5rem]">
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="selectAllRecords" class="h-4 w-4 rounded border-gray-300 text-prcnavy focus:ring-prcgold">
+                            <span>Select</span>
+                        </label>
+                    </th>
                     <th class="px-6 py-4 border-b border-gray-100 w-[34rem]">School & Region</th>
                     <th class="px-6 py-4 border-b border-gray-100 w-[32rem]">Program Details</th>
                     <th class="px-6 py-4 border-b border-gray-100 w-[24rem]">Student Names</th>
@@ -160,7 +174,7 @@ function getPageUrl($p, $search, $category, $regionFilter, $statusFilter) {
             </thead>
             <tbody class="divide-y divide-gray-50 text-sm">
                 <?php if (empty($records)): ?>
-                <tr><td colspan="7" class="px-6 py-12 text-center text-gray-400 italic">No records found matching your criteria.</td></tr>
+                <tr><td colspan="8" class="px-6 py-12 text-center text-gray-400 italic">No records found matching your criteria.</td></tr>
                 <?php else: ?>
                     <?php foreach ($records as $r): ?>
                     <?php
@@ -175,6 +189,9 @@ function getPageUrl($p, $search, $category, $regionFilter, $statusFilter) {
                         }
                     ?>
                     <tr class="hover:bg-gray-50 transition group">
+                        <td class="px-6 py-4 align-top">
+                            <input type="checkbox" name="ids[]" value="<?php echo (int) $r['id']; ?>" class="record-checkbox h-4 w-4 rounded border-gray-300 text-prcnavy focus:ring-prcgold mt-1">
+                        </td>
                         <td class="px-6 py-4 align-top">
                             <div class="font-bold text-prcnavy leading-snug min-w-[28rem]" title="<?php echo h($r['school_name']); ?>"><?php echo h($r['school_name']); ?></div>
                             <div class="text-[10px] font-bold text-gray-400 uppercase mt-0.5 flex items-center">
@@ -242,6 +259,7 @@ function getPageUrl($p, $search, $category, $regionFilter, $statusFilter) {
                 <?php endif; ?>
             </tbody>
         </table>
+        </form>
     </div>
     
     <!-- Scalable Pagination UI -->
@@ -308,5 +326,53 @@ function getPageUrl($p, $search, $category, $regionFilter, $statusFilter) {
 </form>
 
 <?php require_once __DIR__ . '/../includes/delete_modal.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const bulkDeleteButton = document.getElementById('bulkDeleteButton');
+    const bulkDeleteForm = document.getElementById('bulkDeleteForm');
+    const selectAllRecords = document.getElementById('selectAllRecords');
+    const selectedRecordsCount = document.getElementById('selectedRecordsCount');
+    const recordCheckboxes = Array.from(document.querySelectorAll('.record-checkbox'));
+
+    if (!bulkDeleteButton || !bulkDeleteForm || !selectAllRecords || !selectedRecordsCount || recordCheckboxes.length === 0) {
+        if (selectAllRecords) {
+            selectAllRecords.disabled = true;
+        }
+        return;
+    }
+
+    const syncSelectionState = () => {
+        const selectedCount = recordCheckboxes.filter((checkbox) => checkbox.checked).length;
+        const allChecked = selectedCount > 0 && selectedCount === recordCheckboxes.length;
+
+        selectAllRecords.checked = allChecked;
+        selectAllRecords.indeterminate = selectedCount > 0 && !allChecked;
+        selectedRecordsCount.textContent = `${selectedCount} selected`;
+        selectedRecordsCount.classList.toggle('hidden', selectedCount === 0);
+        bulkDeleteButton.classList.toggle('hidden', selectedCount === 0);
+    };
+
+    selectAllRecords.addEventListener('change', () => {
+        recordCheckboxes.forEach((checkbox) => {
+            checkbox.checked = selectAllRecords.checked;
+        });
+        syncSelectionState();
+    });
+
+    recordCheckboxes.forEach((checkbox) => {
+        checkbox.addEventListener('change', syncSelectionState);
+    });
+
+    bulkDeleteButton.addEventListener('click', () => {
+        const selectedCount = recordCheckboxes.filter((checkbox) => checkbox.checked).length;
+        if (selectedCount > 0 && typeof window.confirmBulkDelete === 'function') {
+            window.confirmBulkDelete(selectedCount);
+        }
+    });
+
+    syncSelectionState();
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/admin_footer.php'; ?>

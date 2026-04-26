@@ -3,6 +3,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/functions.php';
 requireAdmin(); // Enforce auth
+$flashMessages = getFlashMessages();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,19 +47,19 @@ requireAdmin(); // Enforce auth
 
                     <a href="<?php echo BASE_URL; ?>/admin/records.php" class="flex items-center rounded-xl px-4 py-3 transition-all duration-200 <?php echo ($currentPage == 'records.php') ? 'border border-gray-100 bg-prclight text-prcnavy shadow-sm' : 'text-gray-500 hover:bg-prclight hover:text-prcnavy'; ?>">
                         <i class="fa-solid fa-layer-group w-6 text-center <?php echo ($currentPage == 'records.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i>
-                        <span class="ml-3">Record Vault</span>
+                        <span class="ml-3">All Records</span>
                     </a>
 
                     <a href="<?php echo BASE_URL; ?>/admin/upload.php" class="flex items-center rounded-xl px-4 py-3 transition-all duration-200 <?php echo ($currentPage == 'upload.php') ? 'border border-gray-100 bg-prclight text-prcnavy shadow-sm' : 'text-gray-500 hover:bg-prclight hover:text-prcnavy'; ?>">
                         <i class="fa-solid fa-cloud-arrow-up w-6 text-center <?php echo ($currentPage == 'upload.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i>
-                        <span class="ml-3">Secure Upload</span>
+                        <span class="ml-3">Add File</span>
                     </a>
 
                     <a href="<?php echo BASE_URL; ?>/admin/manual-entry.php" class="group flex items-center rounded-xl px-4 py-3 transition-all duration-200 <?php echo ($currentPage == 'manual-entry.php') ? 'border border-gray-100 bg-prclight text-prcnavy shadow-sm' : 'text-gray-500 hover:bg-prclight hover:text-prcnavy'; ?>">
                         <i class="fa-solid fa-keyboard w-6 text-center <?php echo ($currentPage == 'manual-entry.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i>
                         <div class="ml-3 flex flex-col">
-                            <span>Manual Log</span>
-                            <span class="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-gray-400">No Physical File</span>
+                            <span>Manual Entry</span>
+                            <span class="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-gray-400">No Document File</span>
                         </div>
                     </a>
 
@@ -67,6 +68,22 @@ requireAdmin(); // Enforce auth
                         <div class="ml-3 flex flex-col">
                             <span>Exemption Migration</span>
                             <span class="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-gray-400">Split Existing Rows</span>
+                        </div>
+                    </a>
+
+                    <a href="<?php echo BASE_URL; ?>/admin/programs.php" class="group flex items-center rounded-xl px-4 py-3 transition-all duration-200 <?php echo ($currentPage == 'programs.php') ? 'border border-gray-100 bg-prclight text-prcnavy shadow-sm' : 'text-gray-500 hover:bg-prclight hover:text-prcnavy'; ?>">
+                        <i class="fa-solid fa-tags w-6 text-center <?php echo ($currentPage == 'programs.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i>
+                        <div class="ml-3 flex flex-col">
+                            <span>Manage Programs</span>
+                            <span class="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-gray-400">Rename &amp; Merge</span>
+                        </div>
+                    </a>
+
+                    <a href="<?php echo BASE_URL; ?>/admin/users.php" class="group flex items-center rounded-xl px-4 py-3 transition-all duration-200 <?php echo ($currentPage == 'users.php') ? 'border border-gray-100 bg-prclight text-prcnavy shadow-sm' : 'text-gray-500 hover:bg-prclight hover:text-prcnavy'; ?>">
+                        <i class="fa-solid fa-users-gear w-6 text-center <?php echo ($currentPage == 'users.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i>
+                        <div class="ml-3 flex flex-col">
+                            <span>User Management</span>
+                            <span class="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-gray-400">Admin-Created Accounts</span>
                         </div>
                     </a>
 
@@ -105,10 +122,12 @@ requireAdmin(); // Enforce auth
             <div id="mobile-menu" class="fixed inset-x-0 top-20 z-40 hidden border-b border-gray-100 bg-white/95 shadow-soft-lg backdrop-blur-md md:hidden">
                 <nav class="space-y-2 px-4 py-6 text-center text-sm font-medium">
                     <a href="<?php echo BASE_URL; ?>/admin/dashboard.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'dashboard.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-chart-line mr-2 <?php echo ($currentPage == 'dashboard.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Dashboard</a>
-                    <a href="<?php echo BASE_URL; ?>/admin/records.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'records.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-layer-group mr-2 <?php echo ($currentPage == 'records.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Records</a>
-                    <a href="<?php echo BASE_URL; ?>/admin/upload.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'upload.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-cloud-arrow-up mr-2 <?php echo ($currentPage == 'upload.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Upload</a>
+                    <a href="<?php echo BASE_URL; ?>/admin/records.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'records.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-layer-group mr-2 <?php echo ($currentPage == 'records.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> All Records</a>
+                    <a href="<?php echo BASE_URL; ?>/admin/upload.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'upload.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-cloud-arrow-up mr-2 <?php echo ($currentPage == 'upload.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Add File</a>
                     <a href="<?php echo BASE_URL; ?>/admin/manual-entry.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'manual-entry.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-keyboard mr-2 <?php echo ($currentPage == 'manual-entry.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Manual Entry</a>
                     <a href="<?php echo BASE_URL; ?>/admin/migrate_exemptions.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'migrate_exemptions.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-shuffle mr-2 <?php echo ($currentPage == 'migrate_exemptions.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Exemption Migration</a>
+                    <a href="<?php echo BASE_URL; ?>/admin/programs.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'programs.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-tags mr-2 <?php echo ($currentPage == 'programs.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Program Manager</a>
+                    <a href="<?php echo BASE_URL; ?>/admin/users.php" class="block rounded-xl px-4 py-3 <?php echo ($currentPage == 'users.php') ? 'bg-gray-50 text-prcnavy' : 'hover:bg-gray-50'; ?>"><i class="fa-solid fa-users-gear mr-2 <?php echo ($currentPage == 'users.php') ? 'text-prcgold' : 'text-gray-400'; ?>"></i> Users</a>
                     <a href="<?php echo BASE_URL; ?>/logout.php" class="mt-4 block rounded-xl px-4 py-3 text-red-500 transition hover:bg-red-50"><i class="fa-solid fa-power-off mr-2"></i> Logout</a>
                 </nav>
             </div>

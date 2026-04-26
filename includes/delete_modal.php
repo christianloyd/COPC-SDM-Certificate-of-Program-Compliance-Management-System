@@ -1,4 +1,4 @@
-<!-- 
+<!--
     Delete Confirmation Modal Partial
     Included in: admin/records.php, admin/edit.php
 -->
@@ -103,7 +103,7 @@
     }
 
     @keyframes dm-pulse-out {
-        0%   { transform: scale(0.9); opacity: 0.6; }
+        0% { transform: scale(0.9); opacity: 0.6; }
         100% { transform: scale(1.5); opacity: 0; }
     }
 
@@ -210,7 +210,6 @@
     .dm-btn-cancel:hover { background: var(--dm-gray-100); }
 </style>
 
-<!-- Modal Structure -->
 <div id="dmOverlay" role="dialog" aria-modal="true">
     <div class="dm-card text-center">
         <div class="dm-top">
@@ -234,7 +233,7 @@
         <div class="dm-body">
             <div class="dm-warning">
                 <span class="dm-tag">Irreversible Action</span>
-                <p>You are about to permanently delete this record. This action <span class="dm-danger">cannot be undone</span> and will remove all attachments.</p>
+                <p id="dmMessageText">You are about to permanently delete this record. This action <span class="dm-danger">cannot be undone</span> and will remove all attachments.</p>
             </div>
             <p style="font-size: 11px; font-style: italic; color: var(--dm-gray-400);">Are you sure you want to proceed?</p>
         </div>
@@ -258,37 +257,88 @@
 <script>
 (function () {
     let pendingDeleteId = null;
-    const overlay    = document.getElementById('dmOverlay');
+    let deleteMode = 'single';
+    const overlay = document.getElementById('dmOverlay');
     const confirmBtn = document.getElementById('dmConfirmBtn');
-    const cancelBtn  = document.getElementById('dmCancelBtn');
-    
-    // Parent components must have forms with these specific IDs
+    const cancelBtn = document.getElementById('dmCancelBtn');
+    const messageText = document.getElementById('dmMessageText');
     const deleteForm = document.getElementById('deleteForm');
     const deleteIdInput = document.getElementById('deleteId');
+    const bulkDeleteForm = document.getElementById('bulkDeleteForm');
 
-    /* ── Global trigger function ── */
+    function setModalMessage(message) {
+        if (messageText) {
+            messageText.innerHTML = message;
+        }
+    }
+
+    function setConfirmButtonMarkup(label) {
+        if (!confirmBtn) {
+            return;
+        }
+
+        confirmBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            ${label}
+        `;
+    }
+
     window.confirmDelete = function (id) {
+        deleteMode = 'single';
         pendingDeleteId = id;
+        setModalMessage('You are about to permanently delete this record. This action <span class="dm-danger">cannot be undone</span> and will remove all attachments.');
+        setConfirmButtonMarkup('Confirm &amp; Delete');
+        overlay.classList.add('visible');
+    };
+
+    window.confirmBulkDelete = function (count) {
+        deleteMode = 'bulk';
+        pendingDeleteId = null;
+        setModalMessage(`You are about to permanently delete <span class="dm-danger">${count} selected record${count === 1 ? '' : 's'}</span>. This action <span class="dm-danger">cannot be undone</span> and shared attachments with no remaining links will also be removed.`);
+        setConfirmButtonMarkup('Delete Selected Records');
         overlay.classList.add('visible');
     };
 
     function closeModal() {
         overlay.classList.remove('visible');
         pendingDeleteId = null;
+        deleteMode = 'single';
     }
 
-    cancelBtn.addEventListener('click', closeModal);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeModal);
+    }
 
-    confirmBtn.addEventListener('click', function () {
-        if (pendingDeleteId !== null && deleteForm && deleteIdInput) {
-            deleteIdInput.value = pendingDeleteId;
-            deleteForm.submit();
-        }
-    });
+    if (overlay) {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                closeModal();
+            }
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function () {
+            if (deleteMode === 'bulk' && bulkDeleteForm) {
+                bulkDeleteForm.submit();
+                return;
+            }
+
+            if (pendingDeleteId !== null && deleteForm && deleteIdInput) {
+                deleteIdInput.value = pendingDeleteId;
+                deleteForm.submit();
+            }
+        });
+    }
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && overlay.classList.contains('visible')) closeModal();
+        if (e.key === 'Escape' && overlay && overlay.classList.contains('visible')) {
+            closeModal();
+        }
     });
 })();
 </script>

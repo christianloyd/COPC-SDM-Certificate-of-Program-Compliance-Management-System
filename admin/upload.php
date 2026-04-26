@@ -6,6 +6,18 @@ require_once __DIR__ . '/../includes/functions.php';
 
 requireAdmin();
 $pageTitle = "Secure Upload & Import";
+
+// Fetch data for searchable dropdowns
+try {
+    $pdo = getDBConnection();
+    $allPrograms = $pdo->query("SELECT DISTINCT program FROM copc_documents WHERE program IS NOT NULL AND program != '' ORDER BY program ASC")->fetchAll(PDO::FETCH_COLUMN);
+    $allSchools  = $pdo->query("SELECT DISTINCT school_name FROM copc_documents WHERE school_name IS NOT NULL AND school_name != '' ORDER BY school_name ASC")->fetchAll(PDO::FETCH_COLUMN);
+} catch (\Exception $e) {
+    $allPrograms = [];
+    $allSchools = [];
+}
+$allRegions = getPHRegions();
+
 require_once __DIR__ . '/../includes/admin_header.php';
 
 $csrfToken = generateCsrfToken();
@@ -68,15 +80,27 @@ $csrfToken = generateCsrfToken();
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="md:col-span-2">
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Region</label>
-                        <input type="text" name="region" placeholder="e.g. NCR, Region IV-A" class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                        <div class="combobox-wrapper" data-options='<?php echo h(json_encode($allRegions)); ?>'>
+                            <input type="text" name="region" placeholder="e.g. NCR, Region IV-A" autocomplete="off"
+                                   class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition combobox-input">
+                            <div class="combobox-dropdown"></div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">School Name *</label>
-                        <input type="text" name="school_name" required class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                        <div class="combobox-wrapper" data-options='<?php echo h(json_encode($allSchools)); ?>'>
+                            <input type="text" name="school_name" required autocomplete="off"
+                                   class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition combobox-input">
+                            <div class="combobox-dropdown"></div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Program *</label>
-                        <input type="text" name="program" required class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                        <div class="combobox-wrapper" data-options='<?php echo h(json_encode($allPrograms)); ?>'>
+                            <input type="text" name="program" required autocomplete="off"
+                                   class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition combobox-input">
+                            <div class="combobox-dropdown"></div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Category *</label>
@@ -108,8 +132,8 @@ $csrfToken = generateCsrfToken();
                     </div>
                 </div>
 
-                <button type="submit" class="w-full bg-prcnavy hover:bg-prcaccent text-white font-bold py-4 rounded-2xl shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center">
-                    <i class="fa-solid fa-paper-plane mr-2 text-prcgold"></i> Upload & Process Record
+                <button type="submit" class="w-full bg-prcnavy hover:bg-prcaccent text-white font-extrabold py-5 rounded-2xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center justify-center">
+                    <i class="fa-solid fa-cloud-arrow-up mr-2 text-prcgold"></i> Save & Upload Record
                 </button>
             </form>
         </section>
@@ -154,7 +178,11 @@ $csrfToken = generateCsrfToken();
 
                 <div class="relative">
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Region Fallback</label>
-                    <input type="text" name="batch_region" placeholder="e.g. REGION-XI or CHEDRO-XI" class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy font-medium focus:ring-2 focus:ring-prcgold focus:outline-none transition shadow-sm">
+                    <div class="combobox-wrapper" data-options='<?php echo h(json_encode($allRegions)); ?>'>
+                        <input type="text" name="batch_region" placeholder="e.g. REGION-XI or CHEDRO-XI" autocomplete="off"
+                               class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy font-medium focus:ring-2 focus:ring-prcgold focus:outline-none transition shadow-sm combobox-input">
+                        <div class="combobox-dropdown"></div>
+                    </div>
                     <p class="mt-1 text-[10px] text-gray-400 uppercase">Used when the Excel or CSV row has no Region value</p>
                 </div>
 
@@ -189,7 +217,7 @@ $csrfToken = generateCsrfToken();
                 </div>
 
                 <button type="submit" class="w-full bg-prcgold hover:bg-yellow-600 text-white font-extrabold py-5 rounded-2xl shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center">
-                    <i class="fa-solid fa-bolt mr-2 opacity-80"></i> START BATCH INGESTION
+                    <i class="fa-solid fa-bolt mr-2 opacity-80"></i> Process Excel List
                 </button>
             </form>
         </section>
@@ -249,7 +277,11 @@ $csrfToken = generateCsrfToken();
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Global Region Override (Optional)</label>
-                        <input type="text" name="global_region" placeholder="Assigned if extraction fails..." class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition">
+                        <div class="combobox-wrapper" data-options='<?php echo h(json_encode($allRegions)); ?>'>
+                            <input type="text" name="global_region" placeholder="Assigned if extraction fails..." autocomplete="off"
+                                   class="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-prcnavy focus:ring-2 focus:ring-prcgold focus:outline-none transition combobox-input">
+                            <div class="combobox-dropdown"></div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Record Category</label>
@@ -272,7 +304,7 @@ $csrfToken = generateCsrfToken();
                 </div>
 
                 <button type="submit" id="startBulkProcessingBtn" class="w-full bg-prcnavy hover:bg-prcaccent text-white font-extrabold py-5 rounded-2xl shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i class="fa-solid fa-play mr-2 text-prcgold"></i> BEGIN PARSING & IMPORT
+                    <i class="fa-solid fa-play mr-2 text-prcgold"></i> Read & Save All PDF Files
                 </button>
             </form>
 

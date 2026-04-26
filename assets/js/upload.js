@@ -40,6 +40,35 @@ document.addEventListener('DOMContentLoaded', () => {
         console[type === 'error' ? 'error' : 'log'](`${title}: ${message}`);
     };
 
+    const showToast = (title, message, type = 'info') => {
+        if (typeof window.showAppToast === 'function') {
+            window.showAppToast({ title, message, type });
+            return;
+        }
+
+        console[type === 'error' ? 'error' : 'log'](`${title}: ${message}`);
+    };
+
+    const showConfirmationModal = async ({
+        title = 'Confirm Action',
+        message = 'Are you sure you want to continue?',
+        subtitle = 'Review before continuing',
+        confirmText = 'Continue'
+    } = {}) => {
+        if (typeof window.showAppConfirm === 'function') {
+            return window.showAppConfirm({
+                title,
+                message,
+                subtitle,
+                confirmText,
+                cancelText: 'Cancel',
+                type: 'warning'
+            });
+        }
+
+        return window.confirm(message);
+    };
+
     if (modeInputs.length) {
         modeInputs.forEach((input) => {
             input.addEventListener('change', () => setUploadMode(input.value));
@@ -106,6 +135,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     singleForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        const confirmed = await showConfirmationModal({
+            title: 'Confirm Upload',
+            subtitle: 'Single record submission',
+            message: 'This will save the uploaded file and create record entries in the Record Vault. Continue?',
+            confirmText: 'Upload Now'
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
         progressOverlay.classList.remove('hidden');
 
         try {
@@ -117,14 +158,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await parseJsonResponse(response);
             if (result.success) {
-                showModalAlert('Upload Complete', result.message || 'Record uploaded successfully.', 'success');
+                showToast('Upload Complete', result.message || 'Record uploaded successfully.', 'success');
                 singleForm.reset();
                 fileStatus.innerText = 'Drag and drop file here or click to browse';
             } else {
                 const detail = result.details ? `\n\nDetails: ${result.details}` : '';
+                showToast('Upload Failed', result.error || 'Unknown server error.', 'error');
                 showModalAlert('Upload Failed', `${result.error || 'Unknown server error.'}${detail}`, 'error');
             }
         } catch (error) {
+            showToast('Upload Error', error.message, 'error');
             showModalAlert('Upload Error', error.message, 'error');
         } finally {
             progressOverlay.classList.add('hidden');
@@ -177,6 +220,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const confirmed = await showConfirmationModal({
+                title: 'Confirm Batch Import',
+                subtitle: 'Bulk record creation',
+                message: 'This will import the selected master list and save all parsed rows into the Record Vault. Continue?',
+                confirmText: 'Start Import'
+            });
+
+            if (!confirmed) {
+                return;
+            }
+
             progressOverlay.classList.remove('hidden');
 
             try {
@@ -188,14 +242,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const result = await parseJsonResponse(response);
                 if (result.success) {
-                    showModalAlert('Import Complete', result.message, 'success');
+                    showToast('Import Complete', result.message, 'success');
                     batchForm.reset();
                     importStatus.innerText = 'Drop Masterlist file here';
                 } else {
                     const detail = result.details ? `\n\nDetails: ${result.details}` : '';
+                    showToast('Import Failed', result.error || 'Unknown server error.', 'error');
                     showModalAlert('Import Failed', `${result.error || 'Unknown server error.'}${detail}`, 'error');
                 }
             } catch (error) {
+                showToast('Import Error', error.message, 'error');
                 showModalAlert('Import Error', error.message, 'error');
             } finally {
                 progressOverlay.classList.add('hidden');

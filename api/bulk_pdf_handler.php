@@ -93,44 +93,76 @@ try {
         }
     }
 
-    // 4. Persistence
+    // 4. Persistence (with duplicate detection — upsert)
     $pdo = getDBConnection();
-    $sql = "INSERT INTO copc_documents 
-            (school_name, program, region, category, date_approved, status, student_list, file_path, file_type, file_name, file_size_kb, extracted_text, entry_type, uploaded_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pdf', ?, ?, ?, 'upload', ?)";
-
-    $stmt = $pdo->prepare($sql);
     $fileSizeKb = ceil($file['size'] / 1024);
     $originalName = mb_substr($file['name'], 0, 250);
 
+    // Prepared statements for duplicate check and upsert
+    $checkSql = "SELECT id FROM copc_documents WHERE school_name = ? AND program = ? AND category = ? AND student_list = ? LIMIT 1";
+    $checkStmt = $pdo->prepare($checkSql);
+
+    $updateSql = "UPDATE copc_documents
+                  SET region=?, date_approved=?, status=?, file_path=?, file_type='pdf', file_name=?, file_size_kb=?, extracted_text=?, entry_type='upload', uploaded_by=?, updated_at=NOW()
+                  WHERE id=?";
+    $updateStmt = $pdo->prepare($updateSql);
+
+    $insertSql = "INSERT INTO copc_documents
+            (school_name, program, region, category, date_approved, status, student_list, file_path, file_type, file_name, file_size_kb, extracted_text, entry_type, uploaded_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pdf', ?, ?, ?, 'upload', ?)";
+    $insertStmt = $pdo->prepare($insertSql);
+
     $pdo->beginTransaction();
+    $insertedCount = 0;
+    $updatedCount = 0;
+
     if ($category === 'COPC Exemption' && !empty($studentNames)) {
         $school = $primaryRecord['school_name'];
         $program = $primaryRecord['program'];
         $region = $primaryRecord['region'];
         $dateApproved = $primaryRecord['date_approved'];
         foreach ($studentNames as $studentName) {
-            $stmt->execute([ $school, $program, $region, $category, $dateApproved, $status, $studentName, $dbPath, $originalName, $fileSizeKb, $extractedText, $uploadedBy ]);
+            $checkStmt->execute([$school, $program, $category, $studentName]);
+            $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                $updateStmt->execute([$region, $dateApproved, $status, $dbPath, $originalName, $fileSizeKb, $extractedText, $uploadedBy, $existing['id']]);
+                $updatedCount++;
+            } else {
+                $insertStmt->execute([$school, $program, $region, $category, $dateApproved, $status, $studentName, $dbPath, $originalName, $fileSizeKb, $extractedText, $uploadedBy]);
+                $insertedCount++;
+            }
         }
     } else {
         foreach ($records as $record) {
-            $stmt->execute([
-                $record['school_name'],
-                $record['program'],
-                $record['region'],
-                $category,
-                $record['date_approved'],
-                $status,
-                $studentList,
-                $dbPath,
-                $originalName,
-                $fileSizeKb,
-                $extractedText,
-                $uploadedBy
-            ]);
+            $checkStmt->execute([$record['school_name'], $record['program'], $category, $studentList]);
+            $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                $updateStmt->execute([$record['region'], $record['date_approved'], $status, $dbPath, $originalName, $fileSizeKb, $extractedText, $uploadedBy, $existing['id']]);
+                $updatedCount++;
+            } else {
+                $insertStmt->execute([
+                    $record['school_name'],
+                    $record['program'],
+                    $record['region'],
+                    $category,
+                    $record['date_approved'],
+                    $status,
+                    $studentList,
+                    $dbPath,
+                    $originalName,
+                    $fileSizeKb,
+                    $extractedText,
+                    $uploadedBy
+                ]);
+                $insertedCount++;
+            }
         }
     }
     $pdo->commit();
+
+    $totalCount = $insertedCount + $updatedCount;
 
     echo json_encode([
         'success' => true,
@@ -141,7 +173,9 @@ try {
             'region' => $primaryRecord['region'],
             'date' => $primaryRecord['date_approved']
         ],
-        'count' => ($category === 'COPC Exemption' && !empty($studentNames)) ? count($studentNames) : count($records)
+        'count' => $totalCount,
+        'inserted' => $insertedCount,
+        'updated' => $updatedCount
     ]);
 
 } catch (Exception $e) {

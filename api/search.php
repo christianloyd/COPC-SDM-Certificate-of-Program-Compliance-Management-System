@@ -117,7 +117,7 @@ try {
         $orderSql = "($relevanceSql) DESC, " . $orderSql;
     }
 
-    $sql = "SELECT id, school_name, program, region, category, date_approved, status, student_list, extracted_text, entry_type, file_type, file_size_kb
+    $sql = "SELECT id, school_name, program, region, category, copc_no, date_approved, status, student_list, extracted_text, notes, entry_type, file_type, file_size_kb
             FROM copc_documents
             WHERE $whereSql
             ORDER BY $orderSql

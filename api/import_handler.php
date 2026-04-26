@@ -39,6 +39,82 @@ function normalizeTextCell($value): string
     return trim((string) $value);
 }
 
+/**
+ * Normalise a program name coming from Excel / CSV imports.
+ *
+ * Strips known OCR / Excel-parse artefacts and maps common abbreviations
+ * to their canonical PRC-recognised full names.
+ */
+function normalizeProgram(string $program): string
+{
+    $program = trim($program);
+
+    // Strip trailing " - N/A" artefact (case-insensitive)
+    $program = preg_replace('/\s*-\s*n\/a\s*$/i', '', $program);
+
+    // Strip trailing " - <word>" when that word is already present in the base.
+    // e.g. "Bachelor of Science in Nursing - Nursing" → "Bachelor of Science in Nursing"
+    $program = preg_replace_callback(
+        '/^(.+?)\s*-\s*(\S[^-]*)$/',
+        static function (array $m): string {
+            $base   = rtrim($m[1]);
+            $suffix = trim($m[2]);
+            return (stripos($base, $suffix) !== false) ? $base : $m[0];
+        },
+        $program
+    );
+
+    $program = trim($program);
+
+    // Known abbreviation → canonical full-name map (exact, case-insensitive key lookup)
+    static $aliases = [
+        // ── Nursing ──────────────────────────────────────
+        'bs in nursing'                             => 'Bachelor of Science in Nursing',
+        'bs nursing'                                => 'Bachelor of Science in Nursing',
+        'bsn'                                       => 'Bachelor of Science in Nursing',
+        'b.s. in nursing'                           => 'Bachelor of Science in Nursing',
+        'b.s. nursing'                              => 'Bachelor of Science in Nursing',
+        // ── Education ────────────────────────────────────
+        'bs in education'                           => 'Bachelor of Science in Education',
+        'bs education'                              => 'Bachelor of Science in Education',
+        'bsed'                                      => 'Bachelor of Secondary Education',
+        // ── Accountancy ──────────────────────────────────
+        'bs in accountancy'                         => 'Bachelor of Science in Accountancy',
+        'bs accountancy'                            => 'Bachelor of Science in Accountancy',
+        'bsa'                                       => 'Bachelor of Science in Accountancy',
+        // ── Information Technology ───────────────────────
+        'bs in information technology'              => 'Bachelor of Science in Information Technology',
+        'bs information technology'                 => 'Bachelor of Science in Information Technology',
+        'bsit'                                      => 'Bachelor of Science in Information Technology',
+        // ── Computer Science ─────────────────────────────
+        'bs in computer science'                    => 'Bachelor of Science in Computer Science',
+        'bs computer science'                       => 'Bachelor of Science in Computer Science',
+        'bscs'                                      => 'Bachelor of Science in Computer Science',
+        // ── Engineering ──────────────────────────────────
+        'bs in civil engineering'                   => 'Bachelor of Science in Civil Engineering',
+        'bsce'                                      => 'Bachelor of Science in Civil Engineering',
+        'bs in electrical engineering'              => 'Bachelor of Science in Electrical Engineering',
+        'bsee'                                      => 'Bachelor of Science in Electrical Engineering',
+        'bs in mechanical engineering'              => 'Bachelor of Science in Mechanical Engineering',
+        'bsme'                                      => 'Bachelor of Science in Mechanical Engineering',
+        // ── Psychology ───────────────────────────────────
+        'bs in psychology'                          => 'Bachelor of Science in Psychology',
+        'bs psychology'                             => 'Bachelor of Science in Psychology',
+        'bspsych'                                   => 'Bachelor of Science in Psychology',
+        // ── Medicine / Medical ───────────────────────────
+        'bs in medical technology'                  => 'Bachelor of Science in Medical Technology',
+        'bsmt'                                      => 'Bachelor of Science in Medical Technology',
+        'bs in pharmacy'                            => 'Bachelor of Science in Pharmacy',
+        'bspharm'                                   => 'Bachelor of Science in Pharmacy',
+        // ── Business ─────────────────────────────────────
+        'bs in business administration'             => 'Bachelor of Science in Business Administration',
+        'bsba'                                      => 'Bachelor of Science in Business Administration',
+    ];
+
+    $lower = strtolower($program);
+    return $aliases[$lower] ?? $program;
+}
+
 function parseImportedDate($value): string
 {
     if ($value === null || $value === '') {
@@ -74,6 +150,8 @@ function detectHeaderMap(array $rows): ?array
         'student_list' => ['student list', 'exempted students', 'student exemption list'],
         'region' => ['region', 'address'],
         'category' => ['permit type', 'type', 'category'],
+        'copc_no' => ['copc no', 'copc no.', 'copc number', 'copc resolution no', 'copc resolution', 'resolution no', 'resolution no.', 'certificate no', 'certificate no.', 'permit no', 'permit no.'],
+        'notes' => ['notes', 'remarks', 'comments', 'comment', 'record notes'],
     ];
 
     foreach ($rows as $index => $row) {
@@ -230,10 +308,15 @@ function buildRecordFromRow(array $row, array $map, string $defaultCategory, str
     $region = isset($map['region']) ? normalizeTextCell($row[$map['region']] ?? '') : '';
     $studentList = isset($map['student_list']) ? normalizeTextCell($row[$map['student_list']] ?? '') : '';
     $categoryText = isset($map['category']) ? strtoupper(normalizeTextCell($row[$map['category']] ?? '')) : '';
+    $copcNo = isset($map['copc_no']) ? normalizeTextCell($row[$map['copc_no']] ?? '') : '';
+    $notes = isset($map['notes']) ? normalizeTextCell($row[$map['notes']] ?? '') : '';
 
     if ($school === '' || $program === '') {
         return null;
     }
+
+    // Normalise program name — strips OCR artefacts and expands known abbreviations
+    $program = normalizeProgram($program);
 
     if ($major !== '') {
         $program .= ' - ' . $major;
@@ -252,13 +335,15 @@ function buildRecordFromRow(array $row, array $map, string $defaultCategory, str
     $date = isset($map['date']) ? parseImportedDate($row[$map['date']] ?? '') : date('Y-m-d');
 
     return [
-        'region' => $region,
-        'school_name' => $school,
-        'program' => $program,
+        'region'        => $region,
+        'school_name'   => $school,
+        'program'       => $program,
         'date_approved' => $date,
-        'status' => $defaultStatus,
-        'student_list' => $studentList,
-        'category' => $category,
+        'status'        => $defaultStatus,
+        'student_list'  => $studentList,
+        'category'      => $category,
+        'copc_no'       => $copcNo !== '' ? $copcNo : null,
+        'notes'         => $notes !== '' ? $notes : null,
     ];
 }
 
@@ -418,14 +503,23 @@ try {
     $pdo = getDBConnection();
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare(
-        "INSERT INTO copc_documents
-        (region, school_name, program, date_approved, status, student_list, category, entry_type, uploaded_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'manual', ?)"
-    );
+    // Prepared statements for duplicate check and upsert
+    $checkSql = "SELECT id FROM copc_documents WHERE school_name = ? AND program = ? AND category = ? AND student_list = ? LIMIT 1";
+    $checkStmt = $pdo->prepare($checkSql);
+
+    $updateSql = "UPDATE copc_documents
+                  SET region=?, date_approved=?, status=?, copc_no=?, notes=?, entry_type='manual', uploaded_by=?, updated_at=NOW()
+                  WHERE id=?";
+    $updateStmt = $pdo->prepare($updateSql);
+
+    $insertSql = "INSERT INTO copc_documents
+        (region, school_name, program, date_approved, status, student_list, category, copc_no, notes, entry_type, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?)";
+    $insertStmt = $pdo->prepare($insertSql);
 
     $uploadedBy = $_SESSION['username'] ?? 'admin';
-    $count = 0;
+    $insertedCount = 0;
+    $updatedCount = 0;
 
     foreach ($recordsToInsert as $record) {
         $studentNames = [];
@@ -435,40 +529,84 @@ try {
 
         if ($record['category'] === 'COPC Exemption' && !empty($studentNames)) {
             foreach ($studentNames as $studentName) {
-                $stmt->execute([
-                    $record['region'],
-                    $record['school_name'],
-                    $record['program'],
-                    $record['date_approved'],
-                    $record['status'],
-                    $studentName,
-                    $record['category'],
-                    $uploadedBy,
-                ]);
-                $count++;
+                $checkStmt->execute([$record['school_name'], $record['program'], $record['category'], $studentName]);
+                $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing) {
+                    $updateStmt->execute([
+                        $record['region'],
+                        $record['date_approved'],
+                        $record['status'],
+                        $record['copc_no'] ?? null,
+                        $record['notes'] ?? null,
+                        $uploadedBy,
+                        $existing['id'],
+                    ]);
+                    $updatedCount++;
+                } else {
+                    $insertStmt->execute([
+                        $record['region'],
+                        $record['school_name'],
+                        $record['program'],
+                        $record['date_approved'],
+                        $record['status'],
+                        $studentName,
+                        $record['category'],
+                        $record['copc_no'] ?? null,
+                        $record['notes'] ?? null,
+                        $uploadedBy,
+                    ]);
+                    $insertedCount++;
+                }
             }
             continue;
         }
 
-        $stmt->execute([
-            $record['region'],
-            $record['school_name'],
-            $record['program'],
-            $record['date_approved'],
-            $record['status'],
-            $record['student_list'],
-            $record['category'],
-            $uploadedBy,
-        ]);
-        $count++;
+        $checkStmt->execute([$record['school_name'], $record['program'], $record['category'], $record['student_list']]);
+        $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            $updateStmt->execute([
+                $record['region'],
+                $record['date_approved'],
+                $record['status'],
+                $record['copc_no'] ?? null,
+                $record['notes'] ?? null,
+                $uploadedBy,
+                $existing['id'],
+            ]);
+            $updatedCount++;
+        } else {
+            $insertStmt->execute([
+                $record['region'],
+                $record['school_name'],
+                $record['program'],
+                $record['date_approved'],
+                $record['status'],
+                $record['student_list'],
+                $record['category'],
+                $record['copc_no'] ?? null,
+                $record['notes'] ?? null,
+                $uploadedBy,
+            ]);
+            $insertedCount++;
+        }
     }
 
     $pdo->commit();
 
+    $totalCount = $insertedCount + $updatedCount;
+    $message = "Successfully processed $totalCount records as $category.";
+    if ($updatedCount > 0) {
+        $message .= " ($insertedCount new, $updatedCount updated)";
+    }
+
     importJsonResponse(200, [
         'success' => true,
-        'message' => "Successfully imported $count records as $category.",
-        'count' => $count,
+        'message' => $message,
+        'count' => $totalCount,
+        'inserted' => $insertedCount,
+        'updated' => $updatedCount,
     ]);
 } catch (\Throwable $e) {
     if (isset($pdo) && $pdo->inTransaction()) {

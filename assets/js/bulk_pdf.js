@@ -14,6 +14,35 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let filesToProcess = [];
 
+    const showToast = (title, message, type = 'info') => {
+        if (typeof window.showAppToast === 'function') {
+            window.showAppToast({ title, message, type });
+            return;
+        }
+
+        console[type === 'error' ? 'error' : 'log'](`${title}: ${message}`);
+    };
+
+    const showConfirmationModal = async ({
+        title = 'Confirm Action',
+        message = 'Are you sure you want to continue?',
+        subtitle = 'Review before continuing',
+        confirmText = 'Continue'
+    } = {}) => {
+        if (typeof window.showAppConfirm === 'function') {
+            return window.showAppConfirm({
+                title,
+                message,
+                subtitle,
+                confirmText,
+                cancelText: 'Cancel',
+                type: 'warning'
+            });
+        }
+
+        return window.confirm(message);
+    };
+
     function renderToolStatus(element, tool) {
         if (!element) {
             return;
@@ -131,6 +160,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const files = Array.from(bulkPdfInput.files);
         if (files.length === 0) return;
 
+        const confirmed = await showConfirmationModal({
+            title: 'Confirm PDF Import',
+            subtitle: 'Bulk PDF extraction',
+            message: `This will process ${files.length} PDF file${files.length === 1 ? '' : 's'} and save the extracted records into the Record Vault. Continue?`,
+            confirmText: 'Begin Import'
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
         startBulkProcessingBtn.disabled = true;
         extractionLogBody.innerHTML = '';
         extractionResultsContainer.classList.remove('hidden');
@@ -174,5 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startBulkProcessingBtn.disabled = false;
         bulkPdfForm.reset();
         bulkPdfStatus.innerHTML = 'All files processed. Select more?';
+        showToast('PDF Import Complete', `${completed} PDF file${completed === 1 ? '' : 's'} processed.`, 'success');
     });
 });

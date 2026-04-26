@@ -45,3 +45,44 @@ function formatBytes($bytes, $precision = 2) {
     
     return round($bytes, $precision) . ' ' . $units[$pow];
 }
+
+/**
+ * Store a flash notification for the next request.
+ */
+function setFlashMessage($type, $message, $title = '') {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+
+    $_SESSION['flash_messages'][] = [
+        'type' => $type ?: 'info',
+        'title' => $title,
+        'message' => $message,
+    ];
+}
+
+/**
+ * Return and clear all flash notifications.
+ */
+function getFlashMessages() {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+
+    $messages = $_SESSION['flash_messages'] ?? [];
+    unset($_SESSION['flash_messages']);
+
+    return is_array($messages) ? $messages : [];
+}
+
+/**
+ * Standard list of Philippine Regions
+ */
+function getPHRegions() {
+    return [
+        'NCR', 'CAR', 'Region I', 'Region II', 'Region III', 'Region IV-A', 
+        'Region IV-B', 'Region V', 'Region VI', 'Region VII', 'Region VIII', 
+        'Region IX', 'Region X', 'Region XI', 'Region XII', 'Region XIII', 
+        'Region XVIII (NIR)', 'BARMM'
+    ];
+}

@@ -397,6 +397,7 @@ try {
                         <th class="px-6 py-4 border-b border-gray-100 w-[14rem]">Category</th>
                         <th class="px-6 py-4 border-b border-gray-100 w-[34rem]">School</th>
                         <th class="px-6 py-4 border-b border-gray-100 w-[32rem]">Program</th>
+                        <th class="px-6 py-4 border-b border-gray-100 w-[16rem]">COPC No.</th>
                         <th class="px-6 py-4 border-b border-gray-100 w-[18rem]">Student Names</th>
                         <th class="px-6 py-4 border-b border-gray-100 w-[14rem]">Region</th>
                         <th class="px-6 py-4 border-b border-gray-100 w-[12rem]">Approved</th>
